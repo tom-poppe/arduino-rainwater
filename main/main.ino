@@ -2,7 +2,8 @@
  *  Compile time options: 
  *
  *    - local settings/secrets file
- *
+ *    - mqtt
+ *    - pits
  */
 
 /* Copy secrets.h to secrets.local.h and adjust your values */
@@ -30,6 +31,10 @@
   #include <ArduinoMqttClient.h>
 #endif
 
+#ifdef USE_PIT_1
+  #include <SoftwareSerial.h>
+#endif
+
 /* Globals */
 byte wifiMacAddress[6];
 
@@ -38,13 +43,21 @@ byte wifiMacAddress[6];
   MqttClient mqttClient(wifiClient);
 #endif 
 
+#ifdef USE_PIT_1
+  SoftwareSerial serialPit1(PIT_1_RX_PIN, PIT_1_TX_PIN);
+#endif
+
+#ifdef USE_PIT_2
+  SoftwareSerial serialPit2(PIT_2_RX_PIN, PIT_2_TX_PIN);
+#endif
+
 /*
  *  STARTUP sequence:
  *
  *    - Setup communication
  *    - Connect to WIFI
  *    - Connect to MQTT
- *    - Setup devices
+ *    - Setup digital serials
  *
  */
 
@@ -59,6 +72,26 @@ void setup()
   #ifdef USE_MQTT
     setupMqtt();
   #endif
+
+  #ifdef USE_PIT_1
+    Serial.print("Setting up serial comms for ultrasonic sensor for ");
+    Serial.print(PIT_1_NAME);
+    Serial.print(" to baud ");
+    Serial.println(BAUD_ULTRASONIC_SENSOR);
+
+    serialPit1.begin(BAUD_ULTRASONIC_SENSOR);
+  #endif
+
+  #ifdef USE_PIT_2
+    Serial.print("Setting up serial comms for ultrasonic sensor for ");
+    Serial.print(PIT_2_NAME);
+    Serial.print(" to baud ");
+    Serial.println(BAUD_ULTRASONIC_SENSOR);
+
+    serialPit2.begin(BAUD_ULTRASONIC_SENSOR);
+  #endif
+
+  Serial.println("Startup sequence done");
 }
 
 /* Start serial monitor communication */
