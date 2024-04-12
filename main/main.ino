@@ -26,8 +26,17 @@
 /* Libs */
 #include <WiFiS3.h>
 
+#ifdef USE_MQTT
+  #include <ArduinoMqttClient.h>
+#endif
+
 /* Globals */
 byte wifiMacAddress[6];
+
+#ifdef USE_MQTT
+  WiFiClient wifiClient;
+  MqttClient mqttClient(wifiClient);
+#endif 
 
 /*
  *  STARTUP sequence:
@@ -46,7 +55,10 @@ void setup()
   Serial.println("Starting rainwater monitor");
 
   setupWifi();
- 
+
+  #ifdef USE_MQTT
+    setupMqtt();
+  #endif
 }
 
 /* Start serial monitor communication */
@@ -98,10 +110,30 @@ void connectToWifiNetwork()
   }
 }
 
+/* MQTT functions: setup, send, ... */
 
+#ifdef USE_MQTT
 
+void setupMqtt()
+{
+  Serial.print("Connecting to MQTT broker ");
+  Serial.print(MQTT_HOST);
+  Serial.print(":");
+  Serial.println(MQTT_PORT);
 
+  mqttClient.setId(MQTT_CLIENT_ID);
+  mqttClient.setUsernamePassword(MQTT_LOGIN, MQTT_PASS);
 
+  if (!mqttClient.connect(MQTT_HOST, MQTT_PORT)) {
+
+    Serial.print("MQTT connection failed! Error code = ");
+    Serial.println(mqttClient.connectError());
+
+    die("Failed to connect to MQTT broker");
+  }
+}
+
+#endif /* USE_MQTT */
 
 void loop()
 {
@@ -124,6 +156,8 @@ void die(String error)
 
 void printNetworkStats()
 {
+  Serial.println("WIFI settings:");
+
   // Mac
   printWifiMacAddress();
 
