@@ -1,0 +1,1 @@
+#define SERIAL_MONITOR_BAUD 9600
