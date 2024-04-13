@@ -196,6 +196,20 @@ void loop()
     #endif
   #endif
 
+  #ifdef USE_PRESSURE
+    float pressureAnalog = readWaterPressure();
+    float pressureVolt   = convertAnalogPressureToVolt(pressureAnalog);
+    float pressureBar    = convertVoltPressureToKpa(pressureVolt);
+    float pressurekPa    = convertVoltPressureToBar(pressureVolt);
+
+    #ifdef USE_MQTT
+      sendMqttMessage(MQTT_TOPIC_PRESSURE_ANALOG, pressureAnalog);
+      sendMqttMessage(MQTT_TOPIC_PRESSURE_VOLT,   pressureVolt);
+      sendMqttMessage(MQTT_TOPIC_PRESSURE_KPA,    pressureBar);
+      sendMqttMessage(MQTT_TOPIC_PRESSURE_BAR,    pressurekPa);
+    #endif
+  #endif
+
   delay(ALARM_LOOP_TIME);
 }
 
@@ -340,6 +354,33 @@ float parsedistance(String name, unsigned char data[4])
 
   return NULL;
 }
+
+/* Read water pressure from analog sensor */
+
+#ifdef USE_PRESSURE
+
+float readWaterPressure()
+{
+  // Returns 0 (0.5V) to 1023 (4.5V)
+  return analogRead(PRESSURE_READING_PIN);
+}
+
+float convertAnalogPressureToVolt(float analog)
+{
+  return analog * 5.00 / 1024;
+}
+
+float convertVoltPressureToKpa(float volt)
+{
+  return (volt - PRESSURE_CALIBRATION_OFFSET) * 250;
+}
+
+float convertVoltPressureToBar(float volt)
+{
+  return (volt - PRESSURE_CALIBRATION_OFFSET) * 250 / 100;
+}
+
+#endif /* USE_PRESSURE */
 
 /* Send an MQTT message */
 
