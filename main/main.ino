@@ -37,6 +37,8 @@
 
 /* Globals */
 byte wifiMacAddress[6];
+unsigned long lastPressureReadingTime = 0;
+float lastPressureReadingBar = 0;
 
 #ifdef USE_MQTT
   WiFiClient wifiClient;
@@ -175,10 +177,14 @@ void setupMqtt()
  *  - Read pit 2 & send MQTT
  *  - Read Water pressure & send MQTT
  *
+ *  TODO: output to LCD?
  */
 
 void loop()
 {
+  /* Show network */
+  printNetworkStats();
+
   /* Read pit 1*/
   #ifdef USE_PIT_1
     float distance1 = readDistanceFromPit1();
@@ -197,17 +203,28 @@ void loop()
   #endif
 
   #ifdef USE_PRESSURE
-    float pressureAnalog = readWaterPressure();
-    float pressureVolt   = convertAnalogPressureToVolt(pressureAnalog);
-    float pressureBar    = convertVoltPressureToKpa(pressureVolt);
-    float pressurekPa    = convertVoltPressureToBar(pressureVolt);
+    /* TODO: is there a way of knowing whether measurement is succesfull/something is connected? */
+    /* https://arduino.stackexchange.com/questions/84728/can-i-test-if-something-is-connected-to-analog-pin */
 
-    #ifdef USE_MQTT
-      sendMqttMessage(MQTT_TOPIC_PRESSURE_ANALOG, pressureAnalog);
-      sendMqttMessage(MQTT_TOPIC_PRESSURE_VOLT,   pressureVolt);
-      sendMqttMessage(MQTT_TOPIC_PRESSURE_KPA,    pressureBar);
-      sendMqttMessage(MQTT_TOPIC_PRESSURE_BAR,    pressurekPa);
-    #endif
+    if (
+      ((millis() - lastPressureReadingTime) > PRESSURE_READING_LOOP_TIME) ||
+      (lastPressureReadingBar < PRESSURE_MINIMUM_THRESHOLD)
+    ) { /* Less readings = longer lifespan? */
+      float pressureAnalog = readWaterPressure();
+      float pressureVolt   = convertAnalogPressureToVolt(pressureAnalog);
+      float pressureBar    = convertVoltPressureToKpa(pressureVolt);
+      float pressurekPa    = convertVoltPressureToBar(pressureVolt);
+
+      #ifdef USE_MQTT
+        sendMqttMessage(MQTT_TOPIC_PRESSURE_ANALOG, pressureAnalog);
+        sendMqttMessage(MQTT_TOPIC_PRESSURE_VOLT,   pressureVolt);
+        sendMqttMessage(MQTT_TOPIC_PRESSURE_KPA,    pressureBar);
+        sendMqttMessage(MQTT_TOPIC_PRESSURE_BAR,    pressurekPa);
+      #endif
+
+      lastPressureReadingTime = millis();
+      lastPressureReadingBar = pressureBar;
+    }
   #endif
 
   delay(ALARM_LOOP_TIME);

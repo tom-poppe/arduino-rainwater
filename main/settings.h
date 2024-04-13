@@ -38,6 +38,8 @@
 
 #define PRESSURE_READING_PIN 0
 #define PRESSURE_CALIBRATION_OFFSET 0.483 /* See doc for sensor */
+#define PRESSURE_MINIMUM_THRESHOLD 2.00 /* Do more readings when it drops below */
+#define PRESSURE_READING_LOOP_TIME 60000  /* do 1 reading per minute */
 
 #define MQTT_TOPIC_PRESSURE_ANALOG "sensor/state/rainwater_in_shed/pressure_analog"
 #define MQTT_TOPIC_PRESSURE_VOLT   "sensor/state/rainwater_in_shed/pressure_volt"
