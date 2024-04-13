@@ -168,9 +168,35 @@ void setupMqtt()
 
 #endif /* USE_MQTT */
 
+/*
+ *  MAIN LOOP
+ *
+ *  - Read pit 1 & send MQTT
+ *  - Read pit 2 & send MQTT
+ *  - Read Water pressure & send MQTT
+ *
+ */
+
 void loop()
 {
-  delay(10000);
+  /* Read pit 1*/
+  #ifdef USE_PIT_1
+    float distance1 = readDistanceFromPit1();
+
+    #ifdef USE_MQTT
+      sendMqttMessage(PIT_1_MQTT_TOPIC, distance1);
+    #endif
+  #endif
+
+  #ifdef USE_PIT_2
+    float distance2 = readDistanceFromPit2();
+
+    #ifdef USE_MQTT
+      sendMqttMessage(PIT_2_MQTT_TOPIC, distance2);
+    #endif
+  #endif
+
+  delay(ALARM_LOOP_TIME);
 }
 
 
@@ -234,3 +260,111 @@ void printWifiIp()
   Serial.print("IP: ");
   Serial.println(WiFi.localIP());
 }
+
+/* Read distance from sensor */
+
+#ifdef USE_PIT_1
+
+float readDistanceFromPit1()
+{
+  Serial.print("Getting a distance reading from ");
+  Serial.println(PIT_1_NAME);
+
+  unsigned char data[4]={};
+
+  do {
+    for (int i=0 ; i<4 ; i++) {
+      data[i]=serialPit1.read();
+    }
+  } while(serialPit1.read()==0xff);
+
+  serialPit1.flush();
+
+  return parsedistance(PIT_1_NAME, data);
+}
+
+#endif
+
+#ifdef USE_PIT_2
+
+float readDistanceFromPit2()
+{
+  Serial.print("Getting a distance reading from ");
+  Serial.println(PIT_2_NAME);
+
+  unsigned char data[4]={};
+
+  do {
+    for (int i=0 ; i<4 ; i++) {
+      data[i]=serialPit2.read();
+    }
+  } while(serialPit2.read()==0xff);
+
+  serialPit2.flush();
+
+  return parsedistance(PIT_2_NAME, data);
+}
+
+#endif
+
+/* Check distance reading & convert digital to cm */
+
+float parsedistance(String name, unsigned char data[4])
+{
+  float distance = 0.0;
+
+  Serial.print("distance for ");
+  Serial.print(name);
+  Serial.print(" is ");
+
+  if (data[0] == 0xff) {
+    int sum = (data[0]+data[1]+data[2])&0x00FF;
+    
+    if (sum == data[3]) {
+      distance = ((data[1]<<8)+data[2])/10;
+
+      if (distance > 280) {
+        Serial.print(distance);
+        Serial.println("cm");
+
+        return distance;
+      } else {
+        Serial.println("below the lower limit");
+      }
+    } else {
+      Serial.println("faulty (checksum mismatch)");
+    }
+  } else {
+    Serial.println("faulty (header mismatch)");
+  }
+
+  return NULL;
+}
+
+/* Send an MQTT message */
+
+#ifdef USE_MQTT
+
+void sendMqttMessage(String topic, float measurement)
+{
+  int qos = 1;
+  bool dup = false;
+  bool retain = true;
+
+  if (measurement != NULL) {
+    String payload = String(measurement);
+
+    Serial.print("MQTT: sending ");
+    Serial.print(topic);
+    Serial.print(" with payload ");
+    Serial.println(payload);
+
+    mqttClient.beginMessage(topic, payload.length(), retain, qos, dup);
+    mqttClient.print(payload);
+    mqttClient.endMessage();
+  } else {
+    Serial.println("MQTT: not sending a NULL reading");
+  }
+}
+
+#endif /* USE_MQTT */
