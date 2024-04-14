@@ -12,7 +12,7 @@
 
 /* PIT sensors */
 
-#define BAUD_ULTRASONIC_SENSOR 57600
+#define BAUD_ULTRASONIC_SENSOR 9600
 
 /* PIT 1 distance */
 

@@ -31,7 +31,7 @@
   #include <ArduinoMqttClient.h>
 #endif
 
-#ifdef USE_PIT_1
+#if defined(USE_PIT_1) || defined(USE_PIT_2)
   #include <SoftwareSerial.h>
 #endif
 
@@ -39,6 +39,7 @@
 byte wifiMacAddress[6];
 unsigned long lastPressureReadingTime = 0;
 float lastPressureReadingBar = 0;
+unsigned char distanceData[4]={};
 
 #ifdef USE_MQTT
   WiFiClient wifiClient;
@@ -182,23 +183,26 @@ void setupMqtt()
 
 void loop()
 {
+  float distance;
+
   /* Show network */
   printNetworkStats();
 
   /* Read pit 1*/
+
   #ifdef USE_PIT_1
-    float distance1 = readDistanceFromPit1();
+    distance = readDistanceFromPit(1);
 
     #ifdef USE_MQTT
-      sendMqttMessage(PIT_1_MQTT_TOPIC, distance1);
+      sendMqttMessage(PIT_1_MQTT_TOPIC, distance);
     #endif
   #endif
 
   #ifdef USE_PIT_2
-    float distance2 = readDistanceFromPit2();
+    distance = readDistanceFromPit(2);
 
     #ifdef USE_MQTT
-      sendMqttMessage(PIT_2_MQTT_TOPIC, distance2);
+      sendMqttMessage(PIT_2_MQTT_TOPIC, distance);
     #endif
   #endif
 
@@ -294,83 +298,82 @@ void printWifiIp()
 
 /* Read distance from sensor */
 
-#ifdef USE_PIT_1
+#if defined(USE_PIT_1) || defined(USE_PIT_2)
 
-float readDistanceFromPit1()
+float readDistanceFromPit(int pitNumber)
 {
   Serial.print("Getting a distance reading from ");
-  Serial.println(PIT_1_NAME);
 
-  unsigned char data[4]={};
-
-  do {
-    for (int i=0 ; i<4 ; i++) {
-      data[i]=serialPit1.read();
-    }
-  } while(serialPit1.read()==0xff);
-
-  serialPit1.flush();
-
-  return parsedistance(PIT_1_NAME, data);
-}
-
-#endif
-
-#ifdef USE_PIT_2
-
-float readDistanceFromPit2()
-{
-  Serial.print("Getting a distance reading from ");
-  Serial.println(PIT_2_NAME);
-
-  unsigned char data[4]={};
-
-  do {
-    for (int i=0 ; i<4 ; i++) {
-      data[i]=serialPit2.read();
-    }
-  } while(serialPit2.read()==0xff);
-
-  serialPit2.flush();
-
-  return parsedistance(PIT_2_NAME, data);
-}
-
-#endif
-
-/* Check distance reading & convert digital to cm */
-
-float parsedistance(String name, unsigned char data[4])
-{
-  float distance = 0.0;
-
-  Serial.print("distance for ");
-  Serial.print(name);
-  Serial.print(" is ");
-
-  if (data[0] == 0xff) {
-    int sum = (data[0]+data[1]+data[2])&0x00FF;
-    
-    if (sum == data[3]) {
-      distance = ((data[1]<<8)+data[2])/10;
-
-      if (distance > 280) {
-        Serial.print(distance);
-        Serial.println("cm");
-
-        return distance;
-      } else {
-        Serial.println("below the lower limit");
-      }
-    } else {
-      Serial.println("faulty (checksum mismatch)");
-    }
-  } else {
-    Serial.println("faulty (header mismatch)");
+  if (pitNumber == 1) {
+    Serial.println(PIT_1_NAME);
+  } else if (pitNumber == 2) {
+    Serial.println(PIT_2_NAME);
   }
 
-  return NULL;
+  return getReadingFromPit(pitNumber);
 }
+
+/* Try to get a correct reading*/
+
+float getReadingFromPit(int pitNumber)
+{
+  for (int loop = 0 ; loop < 60 ; loop++) { // 60 Tries to get a good reading
+    #ifdef USE_PIT_1
+      if (pitNumber == 1) {
+        do {
+          for (int i=0 ; i<4 ; i++) {
+            distanceData[i] = serialPit1.read();
+          }
+        } while (serialPit1.read() == 0xff);
+
+        serialPit1.flush();
+      }
+    #endif /* USE_PIT_1 */
+
+    #ifdef USE_PIT_2
+      if (pitNumber == 2) {
+        do {
+          for (int i=0 ; i<4 ; i++) {
+            distanceData[i] = serialPit2.read();
+          }
+        } while (serialPit2.read() == 0xff);
+
+        serialPit2.flush();
+      }
+    #endif /* USE_PIT_2 */
+
+    if (distanceData[0] == 0xff) {
+      int sum;
+      sum = (distanceData[0] + distanceData[1] + distanceData[2]) & 0x00FF;
+    
+      if(sum == distanceData[3]) {
+        float distance = (distanceData[1]<<8) + distanceData[2];
+        
+        if(distance>280) {
+          Serial.print("Measured ");
+          Serial.print(distance);
+          Serial.print("mm");
+
+          return distance;
+        } else {
+          Serial.println("Below the lower limit (280mm)");
+        }
+      } else {
+        Serial.println("Wrong checksum for reading, doing retry");
+      }
+    } else {
+      Serial.println("Wrong header for reading, doing retry");
+    }
+
+    delay(500);
+  }
+
+  Serial.println("Unable to get a good reading");
+
+  return NULL; /* No reading */
+}
+
+#endif /* USE_PITx */
 
 /* Read water pressure from analog sensor */
 
