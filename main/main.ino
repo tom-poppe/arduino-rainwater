@@ -82,6 +82,9 @@ void setup()
     Serial.print(" to baud ");
     Serial.println(BAUD_ULTRASONIC_SENSOR);
 
+    pinMode(PIT_1_RX_PIN, INPUT);
+    pinMode(PIT_1_TX_PIN, OUTPUT);
+
     serialPit1.begin(BAUD_ULTRASONIC_SENSOR);
   #endif
 
@@ -90,6 +93,9 @@ void setup()
     Serial.print(PIT_2_NAME);
     Serial.print(" to baud ");
     Serial.println(BAUD_ULTRASONIC_SENSOR);
+
+    pinMode(PIT_2_RX_PIN, INPUT);
+    pinMode(PIT_2_TX_PIN, OUTPUT);
 
     serialPit2.begin(BAUD_ULTRASONIC_SENSOR);
   #endif
@@ -317,9 +323,11 @@ float readDistanceFromPit(int pitNumber)
 
 float getReadingFromPit(int pitNumber)
 {
-  for (int loop = 0 ; loop < 60 ; loop++) { // 60 Tries to get a good reading
+  for (int loop = 0 ; loop < DISTANCE_MAX_RETRY_COUNT ; loop++) { // 60 Tries to get a good reading
     #ifdef USE_PIT_1
       if (pitNumber == 1) {
+        serialPit1.listen();
+
         do {
           for (int i=0 ; i<4 ; i++) {
             distanceData[i] = serialPit1.read();
@@ -332,6 +340,8 @@ float getReadingFromPit(int pitNumber)
 
     #ifdef USE_PIT_2
       if (pitNumber == 2) {
+        serialPit2.listen();
+
         do {
           for (int i=0 ; i<4 ; i++) {
             distanceData[i] = serialPit2.read();
@@ -352,7 +362,7 @@ float getReadingFromPit(int pitNumber)
         if(distance>280) {
           Serial.print("Measured ");
           Serial.print(distance);
-          Serial.print("mm");
+          Serial.println("mm");
 
           return distance;
         } else {

@@ -13,6 +13,7 @@
 /* PIT sensors */
 
 #define BAUD_ULTRASONIC_SENSOR 9600
+#define DISTANCE_MAX_RETRY_COUNT 10
 
 /* PIT 1 distance */
 
