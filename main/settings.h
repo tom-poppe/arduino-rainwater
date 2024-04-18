@@ -20,8 +20,6 @@
 #define USE_PIT_1 true /* remove if not used */
 
 #define PIT_1_NAME "Name pit 1"
-#define PIT_1_RX_PIN 11
-#define PIT_1_TX_PIN 10
 #define PIT_1_MQTT_TOPIC "sensor/state/pit1/distance"
 
 /* PIT 2 distance */
@@ -29,8 +27,6 @@
 #define USE_PIT_2 true /* remove if not used */
 
 #define PIT_2_NAME "Name pit 2"
-#define PIT_2_RX_PIN 9
-#define PIT_2_TX_PIN 8
 #define PIT_2_MQTT_TOPIC "sensor/state/pit2/distance"
 
 /* Use water pressure reading */

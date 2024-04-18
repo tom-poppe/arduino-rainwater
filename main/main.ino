@@ -25,34 +25,22 @@
 #endif
 
 /* Libs */
-#include <WiFiS3.h>
+#include <WiFi.h>
 
 #ifdef USE_MQTT
   #include <ArduinoMqttClient.h>
 #endif
 
-#if defined(USE_PIT_1) || defined(USE_PIT_2)
-  #include <SoftwareSerial.h>
-#endif
-
 /* Globals */
+WiFiClient wifiClient;
 byte wifiMacAddress[6];
 unsigned long lastPressureReadingTime = 0;
 float lastPressureReadingBar = 0;
 unsigned char distanceData[4]={};
 
-#ifdef USE_MQTT
-  WiFiClient wifiClient;
+#ifdef USE_MQTT 
   MqttClient mqttClient(wifiClient);
 #endif 
-
-#ifdef USE_PIT_1
-  SoftwareSerial serialPit1(PIT_1_RX_PIN, PIT_1_TX_PIN);
-#endif
-
-#ifdef USE_PIT_2
-  SoftwareSerial serialPit2(PIT_2_RX_PIN, PIT_2_TX_PIN);
-#endif
 
 /*
  *  STARTUP sequence:
@@ -82,10 +70,7 @@ void setup()
     Serial.print(" to baud ");
     Serial.println(BAUD_ULTRASONIC_SENSOR);
 
-    pinMode(PIT_1_RX_PIN, INPUT);
-    pinMode(PIT_1_TX_PIN, OUTPUT);
-
-    serialPit1.begin(BAUD_ULTRASONIC_SENSOR);
+    Serial1.begin(BAUD_ULTRASONIC_SENSOR);
   #endif
 
   #ifdef USE_PIT_2
@@ -94,10 +79,7 @@ void setup()
     Serial.print(" to baud ");
     Serial.println(BAUD_ULTRASONIC_SENSOR);
 
-    pinMode(PIT_2_RX_PIN, INPUT);
-    pinMode(PIT_2_TX_PIN, OUTPUT);
-
-    serialPit2.begin(BAUD_ULTRASONIC_SENSOR);
+    Serial2.begin(BAUD_ULTRASONIC_SENSOR);
   #endif
 
   Serial.println("Startup sequence done");
@@ -129,11 +111,11 @@ void initWifiModule()
 {
   Serial.println("Initializing WIFI module");
 
-  if (WiFi.status() == WL_NO_MODULE) {
+  if (WiFi.status() == WL_NO_SHIELD) {
     die("Communication with WiFi module failed!");
   }
 
-  WiFi.macAddress(wifiMacAddress);
+  //WiFi.macAddress(wifiMacAddress);
 }
 
 void connectToWifiNetwork()
@@ -326,29 +308,25 @@ float getReadingFromPit(int pitNumber)
   for (int loop = 0 ; loop < DISTANCE_MAX_RETRY_COUNT ; loop++) { // 60 Tries to get a good reading
     #ifdef USE_PIT_1
       if (pitNumber == 1) {
-        serialPit1.listen();
-
         do {
           for (int i=0 ; i<4 ; i++) {
-            distanceData[i] = serialPit1.read();
+            distanceData[i] = Serial1.read();
           }
-        } while (serialPit1.read() == 0xff);
+        } while (Serial1.read() == 0xff);
 
-        serialPit1.flush();
+        Serial1.flush();
       }
     #endif /* USE_PIT_1 */
 
     #ifdef USE_PIT_2
       if (pitNumber == 2) {
-        serialPit2.listen();
-
         do {
           for (int i=0 ; i<4 ; i++) {
-            distanceData[i] = serialPit2.read();
+            distanceData[i] = Serial2.read();
           }
-        } while (serialPit2.read() == 0xff);
+        } while (Serial.read() == 0xff);
 
-        serialPit2.flush();
+        Serial2.flush();
       }
     #endif /* USE_PIT_2 */
 
