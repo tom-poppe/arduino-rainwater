@@ -10,6 +10,13 @@
 #define MQTT_HOST "your mqtt host"
 #define MQTT_PORT 1883
 
+/* LCD */
+
+#define USE_LCD true /* remove if not used */
+#define LCD_I2C_ADDRESS 0x20 /* i2c */
+#define LCD_LINES 2
+#define LCD_COLS 16
+
 /* PIT sensors */
 
 #define BAUD_ULTRASONIC_SENSOR 9600

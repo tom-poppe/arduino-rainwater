@@ -25,22 +25,31 @@
 #endif
 
 /* Libs */
+#include <SPI.h>
 #include <WiFi.h>
 
 #ifdef USE_MQTT
   #include <ArduinoMqttClient.h>
 #endif
 
+#ifdef USE_LCD
+  #include <LiquidCrystal_I2C.h>
+#endif
+
 /* Globals */
-WiFiClient wifiClient;
 byte wifiMacAddress[6];
 unsigned long lastPressureReadingTime = 0;
 float lastPressureReadingBar = 0;
 unsigned char distanceData[4]={};
 
 #ifdef USE_MQTT 
+  WiFiClient wifiClient;
   MqttClient mqttClient(wifiClient);
 #endif 
+
+#ifdef USE_LCD
+  LiquidCrystal_I2C lcd(LCD_I2C_ADDRESS, LCD_COLS, LCD_LINES);
+#endif
 
 /*
  *  STARTUP sequence:
@@ -54,9 +63,17 @@ unsigned char distanceData[4]={};
 
 void setup()
 {
+  #ifdef USE_LCD
+    lcd.init();
+    lcd.backlight();
+    lcd.clear();
+  #endif
+
   setupSerialMonitor();
 
   Serial.println("Starting rainwater monitor");
+  lcdPrint(0, 0, "Starting rain",0);
+  lcdPrint(1, 0, "water monitor",0);
 
   setupWifi();
 
@@ -71,6 +88,10 @@ void setup()
     Serial.println(BAUD_ULTRASONIC_SENSOR);
 
     Serial1.begin(BAUD_ULTRASONIC_SENSOR);
+
+    lcdClear();
+    lcdPrint(0,0,"Setting BAUD",0);
+    lcdPrint(1,0,PIT_1_NAME,0);
   #endif
 
   #ifdef USE_PIT_2
@@ -80,6 +101,10 @@ void setup()
     Serial.println(BAUD_ULTRASONIC_SENSOR);
 
     Serial2.begin(BAUD_ULTRASONIC_SENSOR);
+
+    lcdClear();
+    lcdPrint(0,0,"Setting BAUD",0);
+    lcdPrint(1,0,PIT_2_NAME,0);
   #endif
 
   Serial.println("Startup sequence done");
@@ -101,6 +126,8 @@ void setupSerialMonitor()
 void setupWifi()
 {
   Serial.println("Setting up WIFI");
+  lcdClear();
+  lcdPrint(0,0,"Setting up WIFI",0);
 
   initWifiModule();
   connectToWifiNetwork();
@@ -110,12 +137,13 @@ void setupWifi()
 void initWifiModule()
 {
   Serial.println("Initializing WIFI module");
+  lcdPrint(1,0,"Init WIFI mod",0);
 
-  if (WiFi.status() == WL_NO_SHIELD) {
+  if (WiFi.status() == WL_NO_MODULE) {
     die("Communication with WiFi module failed!");
   }
 
-  //WiFi.macAddress(wifiMacAddress);
+  WiFi.macAddress(wifiMacAddress);
 }
 
 void connectToWifiNetwork()
@@ -123,7 +151,9 @@ void connectToWifiNetwork()
   int wifiStatus = WL_IDLE_STATUS;
 
   while (wifiStatus != WL_CONNECTED) {
-    printWifiMacAddress();
+    lcdClear();
+    lcdPrint(0,0,"Connecting to",0);
+    lcdPrint(1,0,WIFI_SSID,0);
 
     Serial.print("Attempting to connect to SSID: ");
     Serial.println(WIFI_SSID);
@@ -144,6 +174,10 @@ void setupMqtt()
   Serial.print(MQTT_HOST);
   Serial.print(":");
   Serial.println(MQTT_PORT);
+
+  lcdClear();
+  lcdPrint(0,0,"Connecting MQTT",0);
+  lcdPrint(1,0,MQTT_HOST,0);
 
   mqttClient.setId(MQTT_CLIENT_ID);
   mqttClient.setUsernamePassword(MQTT_LOGIN, MQTT_PASS);
@@ -181,6 +215,11 @@ void loop()
   #ifdef USE_PIT_1
     distance = readDistanceFromPit(1);
 
+    lcdClear();
+    lcdPrint(0,0,"Distance ",0);
+    lcdPrint(0,9,PIT_1_NAME,0);
+    lcdPrint(1,0,String(distance), 2000);
+
     #ifdef USE_MQTT
       sendMqttMessage(PIT_1_MQTT_TOPIC, distance);
     #endif
@@ -188,6 +227,11 @@ void loop()
 
   #ifdef USE_PIT_2
     distance = readDistanceFromPit(2);
+
+    lcdClear();
+    lcdPrint(0,0,"Distance ",0);
+    lcdPrint(0,9,PIT_2_NAME,0);
+    lcdPrint(1,0,String(distance), 2000);
 
     #ifdef USE_MQTT
       sendMqttMessage(PIT_2_MQTT_TOPIC, distance);
@@ -197,6 +241,7 @@ void loop()
   #ifdef USE_PRESSURE
     /* TODO: is there a way of knowing whether measurement is succesfull/something is connected? */
     /* https://arduino.stackexchange.com/questions/84728/can-i-test-if-something-is-connected-to-analog-pin */
+    /* Also, are there better ways to read ultrasonic serial? */
 
     if (
       ((millis() - lastPressureReadingTime) > PRESSURE_READING_LOOP_TIME) ||
@@ -206,6 +251,10 @@ void loop()
       float pressureVolt   = convertAnalogPressureToVolt(pressureAnalog);
       float pressureBar    = convertVoltPressureToKpa(pressureVolt);
       float pressurekPa    = convertVoltPressureToBar(pressureVolt);
+
+      lcdClear();
+      lcdPrint(0,0,"Pressure",0);
+      lcdPrint(1,0,String(pressureBar), 2000);
 
       #ifdef USE_MQTT
         sendMqttMessage(MQTT_TOPIC_PRESSURE_ANALOG, pressureAnalog);
@@ -228,6 +277,10 @@ void loop()
 void die(String error)
 {
   while(true) {
+    lcdClear();
+    lcdPrint(0,0,"PANIC!",0);
+    lcdPrint(1,0,error,0);
+
     Serial.print("Panic: ");
     Serial.println(error);
     delay(10000);
@@ -239,6 +292,7 @@ void die(String error)
 void printNetworkStats()
 {
   Serial.println("WIFI settings:");
+  lcdClear();
 
   // Mac
   printWifiMacAddress();
@@ -254,17 +308,19 @@ void printNetworkStats()
 
 void printWifiMacAddress()
 {
-  Serial.print("Mac address: ");
-
-  for (int i = 0; i < 6; i++) {
-    if (i > 0) {
-      Serial.print(":");
-    }
+  /* TODO: print MAC to LCD */
+  for (int i = 5; i >= 0; i--) {
     if (wifiMacAddress[i] < 16) {
       Serial.print("0");
     }
+
     Serial.print(wifiMacAddress[i], HEX);
+
+    if (i > 0) {
+      Serial.print(":");
+    }
   }
+
   Serial.println();
 }
 
@@ -274,6 +330,7 @@ void printWifiSsid()
 {
   Serial.print("SSID: ");
   Serial.println(WiFi.SSID());
+  lcdPrint(0,0,WiFi.SSID(),0);
 }
 
 /* Print WIFI IP */
@@ -282,6 +339,7 @@ void printWifiIp()
 {
   Serial.print("IP: ");
   Serial.println(WiFi.localIP());
+  lcdPrint(1,0,WiFi.localIP().toString(),0);
 }
 
 /* Read distance from sensor */
@@ -417,3 +475,20 @@ void sendMqttMessage(String topic, float measurement)
 }
 
 #endif /* USE_MQTT */
+
+void lcdClear()
+{
+  #ifdef USE_LCD
+    lcd.clear();
+  #endif
+}
+
+void lcdPrint(int row, int col, String message, int duration)
+{
+  #ifdef USE_LCD
+    lcd.setCursor(col,row);
+    lcd.print(message);
+
+    delay(duration);
+  #endif
+}
